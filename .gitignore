@@ -174,3 +174,4 @@ cython_debug/
 .pypirc
 alembic
 alembic.ini
+db/trade.db
