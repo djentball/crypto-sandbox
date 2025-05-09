@@ -1,0 +1,25 @@
+
+on: push
+name: 🚀 Deploy website on push
+jobs:
+  web-deploy:
+    name: 🎉 Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: 🚚 Get latest code
+      uses: actions/checkout@v4
+
+    - name: 📂 Install lftp
+      run: sudo apt-get update && sudo apt-get install -y lftp
+
+    - name: 🔄 Deploy via lftp
+      run: |
+        lftp -u "${{ secrets.NAME }},${{ secrets.PASS }}" ${{ secrets.HOST }} <<EOF
+        set ftp:ssl-force true
+        set ftp:ssl-protect-data true
+        mirror -R --only-newer --parallel=5 ./ /www/crypto_sandbox/
+        quit
+        EOF
+    
+
+
