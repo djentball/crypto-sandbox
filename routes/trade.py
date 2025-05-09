@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 router = APIRouter(prefix="/trade", tags=["Trade"])
 
 
-@router.post("/buy", response_model=TradeOut)
+@router.post("/buy")
 async def buy_currency(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
     trade.type = "buy"
     result = await crud.buy_crypto(db, trade)
@@ -23,15 +23,23 @@ async def buy_currency(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
                 "required": result.get("required")
             }
         )
-    return result
+
+    trade_out = result["trade"]
+    total_cost = result["total_cost"]
+
+    trade_out_schema = TradeOut.from_orm(trade_out)  # Конвертація до Pydantic-схеми
+
+    return {**trade_out_schema.dict(), "total_cost": total_cost}
+
 
 @router.post("/sell", response_model=TradeOut)
 async def sell_currency(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
     trade.type = "sell"
-    result = await crud.sell_crypto(db, trade)
+    result = await crud.sell_crypto(trade, db)
     if isinstance(result, str) and "Insufficient" in result:
         raise HTTPException(status_code=400, detail=result)
     return result
+
 
 @router.get("/history", response_model=List[TradeOut])
 async def get_trade_history(symbol: str = None, limit: int = 100, db: AsyncSession = Depends(get_db)):

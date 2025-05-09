@@ -109,15 +109,17 @@ async def get_latest_price(session: AsyncSession, symbol: str):
 async def buy_crypto(db: AsyncSession, trade: TradeCreate):
     user = await get_user_by_id(db, trade.user_id)
     if not user:
-        return "User not found"
+        return {"error": "User not found"}
 
-    price_entry = await get_latest_price(db, trade.symbol)
-    if not price_entry:
-        return {"error": "Price data not available"}
+    try:
+        # Отримуємо актуальну ціну з Binance
+        current_price = await get_binance_price(trade.symbol)
+    except Exception as e:
+        return {"error": f"Failed to fetch price from Binance: {str(e)}"}
 
-    trade.price = price_entry.close  # <-- беремо останню ціну
-
+    trade.price = current_price
     total_cost = trade.price * trade.quantity
+
     if user.usd_balance < total_cost:
         return {
             "error": "Insufficient balance",
@@ -151,82 +153,62 @@ async def buy_crypto(db: AsyncSession, trade: TradeCreate):
     db.add(new_trade)
     await db.commit()
     await db.refresh(new_trade)
-    return new_trade
+
+    return {
+        "trade": new_trade,
+        "total_cost": total_cost
+    }
 
 
-async def sell_crypto(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
-    # Отримуємо поточну ціну
-    price_entry = await db.execute(
-        select(Price).where(Price.symbol == trade.symbol)
-    )
-    price = price_entry.scalar()
-    if not price:
-        raise HTTPException(status_code=404, detail="Price not found for symbol")
+async def sell_crypto(trade: TradeCreate, db: AsyncSession):
+    # Отримаємо актуальну ціну з Binance
+    symbol = trade.symbol.upper()
+    trade_price = await get_binance_price(symbol)
+    trade.price = trade_price
 
-    trade_price = price.price
-    trade_type = TradeType.sell
+    # Отримуємо користувача
+    user = await get_user_by_id(db, trade.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # Отримуємо гаманець користувача
-    wallet_entry = await db.execute(
-        select(Wallet).where(Wallet.user_id == trade.user_id, Wallet.symbol == trade.symbol)
-    )
-    wallet = wallet_entry.scalar()
+    # Отримуємо гаманець
+    wallet = await get_wallet(db, trade.user_id, symbol)
+    if not wallet or wallet.amount < trade.quantity:
+        raise HTTPException(status_code=400, detail="Insufficient crypto balance")
 
-    if not wallet or wallet.quantity < trade.quantity:
-        raise HTTPException(status_code=400, detail="Not enough balance to sell")
+    # Віднімаємо з гаманця
+    wallet.amount -= trade.quantity
+    db.add(wallet)
 
-    # Зменшуємо кількість у гаманці
-    wallet.quantity -= trade.quantity
+    # Додаємо до балансу користувача
+    total_sale_value = trade.quantity * trade_price
+    user.usd_balance += total_sale_value
+    db.add(user)
 
-    # Обчислюємо середню ціну купівлі
-    result = await db.execute(
-        select(Trade)
-        .where(
-            Trade.user_id == trade.user_id,
-            Trade.symbol == trade.symbol,
-            Trade.type == TradeType.buy
-        )
-    )
-    buy_trades = result.scalars().all()
-    total_quantity = sum(t.quantity for t in buy_trades)
-    total_spent = sum(t.price * t.quantity for t in buy_trades)
-    avg_buy_price = total_spent / total_quantity if total_quantity > 0 else 0.0
+    # Підрахунок прибутку (опційно)
+    avg_buy_price = await get_average_buy_price(db, trade.user_id, symbol)
+    profit = None
+    if avg_buy_price is not None:
+        profit = (trade_price - avg_buy_price) * trade.quantity
 
-    # Обчислюємо профіт
-    profit = (trade_price - avg_buy_price) * trade.quantity
-
-    # Створюємо запис про продаж (SQLAlchemy модель)
-    trade_record = Trade(
-        id=str(uuid4()),  # Генерація нового ID
+    # Створюємо запис про продаж
+    new_trade = Trade(
+        id=str(uuid4()),
         user_id=trade.user_id,
-        symbol=trade.symbol,
-        type=trade_type,
+        symbol=symbol,
+        type=TradeType.sell,
         price=trade_price,
         quantity=trade.quantity,
-        timestamp=datetime.utcnow()  # Поточний час для транзакції
+        timestamp=datetime.now(UTC)
     )
-    db.add(trade_record)
+    db.add(new_trade)
 
-    # Зберігаємо зміни в базі даних
     await db.commit()
+    await db.refresh(new_trade)
 
-    # Оновлюємо гаманець в базі даних після зменшення балансу
-    db.add(wallet)
-    await db.commit()
-
-    # Створюємо вихідний TradeOut для повернення
-    trade_out = TradeOut(
-        id=trade_record.id,
-        user_id=trade_record.user_id,
-        symbol=trade_record.symbol,
-        type=trade_record.type,
-        price=trade_record.price,
-        quantity=trade_record.quantity,
-        timestamp=trade_record.timestamp,
-        profit=round(profit, 2)
-    )
-
-    return trade_out
+    # Додаємо прибуток до об'єкта (але не в БД)
+    new_trade.profit = profit
+    return new_trade
 
 
 async def get_binance_price(symbol: str) -> float:

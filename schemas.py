@@ -30,9 +30,11 @@ class TradeOut(TradeBase):
     timestamp: datetime
     type: TradeType
     profit: Optional[float] = None
+    total_cost: Optional[float] = None
 
     class Config:
         from_attributes = True
+
 
 # ===== Price =====
 class PriceBase(BaseModel):
