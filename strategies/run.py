@@ -6,6 +6,7 @@ from strategies.simple_strategy import simple_buy_strategy, simple_sell_strategy
 SYMBOL = "BTCUSDT"
 USER_ID = "b643b244-9b27-436d-9404-c2c4b9e95039" #Prod User
 
+
 async def run():
     async for db in get_session():
         buy_result = await simple_buy_strategy(db, USER_ID, SYMBOL)

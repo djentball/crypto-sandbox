@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.crud import set_base_price, get_base_price
 from db.db import get_db
 from db import crud
-from schemas import TradeOut, TradeCreate
+from schemas import TradeOut, TradeCreate, BasePriceUpdate
 from typing import List
 from fastapi.responses import JSONResponse
 
@@ -44,3 +46,15 @@ async def sell_currency(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
 @router.get("/history", response_model=List[TradeOut])
 async def get_trade_history(symbol: str = None, limit: int = 100, db: AsyncSession = Depends(get_db)):
     return await crud.get_trades(db, symbol, limit)
+
+
+@router.post("/base-price")
+async def update_base_price(data: BasePriceUpdate, db: AsyncSession = Depends(get_db)):
+    price = await set_base_price(db, data.symbol.upper(), data.price)
+    return {"symbol": price.symbol, "price": price.price}
+
+
+@router.get("/base-price/{symbol}")
+async def fetch_base_price(symbol: str, db: AsyncSession = Depends(get_db)):
+    price = await get_base_price(db, symbol.upper())
+    return {"symbol": symbol.upper(), "price": price}

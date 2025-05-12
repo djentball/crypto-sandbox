@@ -94,3 +94,8 @@ class UserBalanceOut(BaseModel):
     usd_balance: float
     crypto: Dict[str, CryptoBalance]
     total_balance_usd: float
+
+
+class BasePriceUpdate(BaseModel):
+    symbol: str
+    price: float

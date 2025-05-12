@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy import select, exists, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Price, Trade, Wallet, User, TradeType
+from db.models import Price, Trade, Wallet, User, TradeType, BasePrice
 from schemas import (
     PriceCreate,
     WalletCreate,
@@ -277,3 +277,21 @@ async def get_average_buy_price(db: AsyncSession, user_id: str, symbol: str) -> 
         return 0.0
 
     return total_spent / total_quantity
+
+
+async def set_base_price(session: AsyncSession, symbol: str, price: float) -> BasePrice:
+    db_price = await session.get(BasePrice, symbol)
+    if db_price:
+        db_price.price = price
+    else:
+        db_price = BasePrice(symbol=symbol, price=price)
+        session.add(db_price)
+    await session.commit()
+    return db_price
+
+
+async def get_base_price(session: AsyncSession, symbol: str) -> float:
+    db_price = await session.get(BasePrice, symbol)
+    if db_price:
+        return db_price.price
+    raise HTTPException(status_code=404, detail=f"Base price for {symbol} not found")

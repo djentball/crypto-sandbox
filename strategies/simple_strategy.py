@@ -1,16 +1,22 @@
 from schemas import TradeCreate
-from db.crud import buy_crypto, sell_crypto, get_binance_price
+from db.crud import buy_crypto, sell_crypto, get_binance_price, get_base_price
 from sqlalchemy.ext.asyncio import AsyncSession
 
+PERCENTAGE_THRESHOLD_BUY = -2.0
+PERCENTAGE_THRESHOLD_SELL = 2.0
+TRADE_QUANTITY = 0.002
 
-TARGET_BUY_PRICE = 102_000
-TARGET_SELL_PRICE = 103_646
-TRADE_QUANTITY = 0.001
+
+def price_change_percent(current_price: float, reference_price: float) -> float:
+    return ((current_price - reference_price) / reference_price) * 100
 
 
 async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
     current_price = await get_binance_price(symbol)
-    if current_price < TARGET_BUY_PRICE:
+    base_price = await get_base_price(db, symbol)
+    change = price_change_percent(current_price, base_price)
+
+    if change <= PERCENTAGE_THRESHOLD_BUY:
         trade_data = TradeCreate(
             user_id=user_id,
             symbol=symbol,
@@ -22,19 +28,24 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
             "action": "buy",
             "executed": True,
             "price": current_price,
+            "change_percent": round(change, 2),
             "details": result
         }
     return {
         "action": "buy",
         "executed": False,
         "price": current_price,
-        "message": f"Price {current_price} is not below target {TARGET_BUY_PRICE}"
+        "change_percent": round(change, 2),
+        "message": f"Price change is {change:.2f}%, not below {PERCENTAGE_THRESHOLD_BUY}%"
     }
 
 
 async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
     current_price = await get_binance_price(symbol)
-    if current_price > TARGET_SELL_PRICE:
+    base_price = await get_base_price(db, symbol)
+    change = price_change_percent(current_price, base_price)
+
+    if change >= PERCENTAGE_THRESHOLD_SELL:
         trade_data = TradeCreate(
             user_id=user_id,
             symbol=symbol,
@@ -46,11 +57,13 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
             "action": "sell",
             "executed": True,
             "price": current_price,
+            "change_percent": round(change, 2),
             "details": result
         }
     return {
         "action": "sell",
         "executed": False,
         "price": current_price,
-        "message": f"Price {current_price} is not above target {TARGET_SELL_PRICE}"
+        "change_percent": round(change, 2),
+        "message": f"Price change is {change:.2f}%, not above {PERCENTAGE_THRESHOLD_SELL}%"
     }

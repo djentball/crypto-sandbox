@@ -56,3 +56,10 @@ class Wallet(Base):
     amount = Column(Float, default=0.0)
 
     user = relationship("User", back_populates="wallets")
+
+
+class BasePrice(Base):
+    __tablename__ = "base_price"
+
+    symbol = Column(String, primary_key=True)
+    price = Column(Float, nullable=False)
