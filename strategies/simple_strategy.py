@@ -15,6 +15,7 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
     current_price = await get_binance_price(symbol)
     base_price = await get_base_price(db, symbol)
     change = price_change_percent(current_price, base_price)
+    target_price = base_price * (1 - PERCENTAGE_THRESHOLD_BUY / 100)
 
     if change <= PERCENTAGE_THRESHOLD_BUY:
         trade_data = TradeCreate(
@@ -37,6 +38,8 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         "price": current_price,
         "change_percent": round(change, 2),
         "message": f"Price change is {change:.2f}%, not below {PERCENTAGE_THRESHOLD_BUY}%"
+                   f" (target price: {target_price:.2f})"
+
     }
 
 
@@ -44,6 +47,7 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
     current_price = await get_binance_price(symbol)
     base_price = await get_base_price(db, symbol)
     change = price_change_percent(current_price, base_price)
+    target_price = base_price * (1 + PERCENTAGE_THRESHOLD_SELL / 100)
 
     if change >= PERCENTAGE_THRESHOLD_SELL:
         trade_data = TradeCreate(
@@ -66,4 +70,5 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         "price": current_price,
         "change_percent": round(change, 2),
         "message": f"Price change is {change:.2f}%, not above {PERCENTAGE_THRESHOLD_SELL}%"
+                   f" (target price: {target_price:.2f})"
     }

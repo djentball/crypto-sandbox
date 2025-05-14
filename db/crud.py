@@ -112,7 +112,7 @@ async def buy_crypto(db: AsyncSession, trade: TradeCreate):
         return {"error": "User not found"}
 
     try:
-        # Отримуємо актуальну ціну з Binance
+
         current_price = await get_binance_price(trade.symbol)
     except Exception as e:
         return {"error": f"Failed to fetch price from Binance: {str(e)}"}
