@@ -2,9 +2,9 @@ from schemas import TradeCreate
 from db.crud import buy_crypto, sell_crypto, get_binance_price, get_base_price
 from sqlalchemy.ext.asyncio import AsyncSession
 
-PERCENTAGE_THRESHOLD_BUY = -2.0
-PERCENTAGE_THRESHOLD_SELL = 2.0
-TRADE_QUANTITY = 0.002
+PERCENTAGE_THRESHOLD_BUY = -0.1
+PERCENTAGE_THRESHOLD_SELL = 0.31
+TRADE_QUANTITY = 0.003
 
 
 def price_change_percent(current_price: float, reference_price: float) -> float:

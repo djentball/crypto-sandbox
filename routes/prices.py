@@ -7,6 +7,7 @@ from typing import List
 
 router = APIRouter(prefix="/prices", tags=["Prices"])
 
+
 @router.get("/", response_model=List[Price])
 async def get_price_history(
     symbol: str = Query(..., description="Наприклад, BTCUSDT"),
