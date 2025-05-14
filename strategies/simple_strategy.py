@@ -37,8 +37,8 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         "executed": False,
         "price": current_price,
         "change_percent": round(change, 2),
-        "message": f"Price change is {change:.2f}%, not below {PERCENTAGE_THRESHOLD_BUY}%"
-                   f" (target price: {target_price:.2f})"
+        "message": f"Price change is {change:.2f}%, not below {PERCENTAGE_THRESHOLD_BUY}% "
+                   f"Target price: {target_price:.2f}"
 
     }
 
@@ -69,6 +69,6 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         "executed": False,
         "price": current_price,
         "change_percent": round(change, 2),
-        "message": f"Price change is {change:.2f}%, not above {PERCENTAGE_THRESHOLD_SELL}%"
-                   f" (target price: {target_price:.2f})"
+        "message": f"Price change is {change:.2f}%, not above {PERCENTAGE_THRESHOLD_SELL}% "
+                   f"Target price: {target_price:.2f}"
     }

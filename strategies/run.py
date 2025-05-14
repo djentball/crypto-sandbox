@@ -2,9 +2,9 @@ import asyncio
 from db.db import get_db as get_session
 from strategies.simple_strategy import simple_buy_strategy, simple_sell_strategy
 
-# USER_ID = "ddec577e-b919-442b-b76d-a2c97c7aabcd" Stage User
+USER_ID = "ddec577e-b919-442b-b76d-a2c97c7aabcd" #Stage User
 SYMBOL = "BTCUSDT"
-USER_ID = "dbfb7742-7cc2-4ddf-8dff-fed0e75ad352" #Prod User
+# USER_ID = "dbfb7742-7cc2-4ddf-8dff-fed0e75ad352" #Prod User
 
 
 async def run():
