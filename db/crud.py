@@ -26,13 +26,6 @@ async def add_price(session: AsyncSession, price: PriceCreate) -> Price:
     return db_price
 
 
-async def price_exists(session: AsyncSession, symbol: str, timestamp: datetime) -> bool:
-    result = await session.execute(
-        select(exists().where(Price.symbol == symbol, Price.timestamp == timestamp))
-    )
-    return result.scalar()
-
-
 async def get_prices(session: AsyncSession, symbol: str, limit: int = 100) -> Sequence[Price]:
     result = await session.execute(
         select(Price)

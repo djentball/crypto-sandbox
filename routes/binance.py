@@ -15,7 +15,7 @@ async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Dep
     params = {
         "symbol": symbol,
         "interval": interval,
-        "limit": 1000  # Максимальна кількість даних
+        "limit": 1000
     }
 
     response = requests.get(BINANCE_API_URL, params=params)
@@ -25,12 +25,11 @@ async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Dep
     if "code" in data:
         return {"error": f"Error from Binance API: {data['msg']}"}
 
-    # Підготовка даних для запису в базу
     prices_to_insert = []
     for item in data:
         price_data = Price(
             symbol=symbol,
-            timestamp=datetime.utcfromtimestamp(item[0] / 1000),  # Перетворення в datetime
+            timestamp=datetime.utcfromtimestamp(item[0] / 1000),
             open=item[1],
             high=item[2],
             low=item[3],
