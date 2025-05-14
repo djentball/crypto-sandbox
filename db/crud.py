@@ -18,18 +18,14 @@ from schemas import (
     CryptoBalance,
 )
 
-from db.db import get_db
-
 
 async def add_price(session: AsyncSession, price: PriceCreate) -> Price:
     db_price = Price(**price.dict())
     session.add(db_price)
     await session.commit()
-    await session.refresh(db_price)
     return db_price
 
 
-# Перевірити, чи свічка вже є (щоб не дублювати по timestamp + symbol)
 async def price_exists(session: AsyncSession, symbol: str, timestamp: datetime) -> bool:
     result = await session.execute(
         select(exists().where(Price.symbol == symbol, Price.timestamp == timestamp))
@@ -37,7 +33,6 @@ async def price_exists(session: AsyncSession, symbol: str, timestamp: datetime) 
     return result.scalar()
 
 
-# Отримати останні N записів для символу
 async def get_prices(session: AsyncSession, symbol: str, limit: int = 100) -> Sequence[Price]:
     result = await session.execute(
         select(Price)

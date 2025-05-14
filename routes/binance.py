@@ -1,48 +1,46 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from db.db import get_db
-from db import crud
-from schemas import PriceCreate
+import requests
 from datetime import datetime
-import httpx
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import insert
+from db.db import get_db
+from db.models import Price
 
 router = APIRouter(prefix="/binance", tags=["Binance"])
-
 BINANCE_API_URL = "https://api.binance.com/api/v3/klines"
 
 
 @router.post("/import")
-async def import_binance_data(
-    symbol: str = Query(..., description="Наприклад, BTCUSDT"),
-    interval: str = Query("1m", description="Наприклад, 1m, 5m, 1h, 1d"),
-    limit: int = Query(100, ge=1, le=1000),
-    db: AsyncSession = Depends(get_db)
-):
-    params = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
+async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Depends(get_db)):
+    params = {
+        "symbol": symbol,
+        "interval": interval,
+        "limit": 1000  # Максимальна кількість даних
+    }
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(BINANCE_API_URL, params=params)
-        response.raise_for_status()
-        klines = response.json()
+    response = requests.get(BINANCE_API_URL, params=params)
+    data = response.json()
 
-    added = 0
-    for kline in klines:
-        ts = datetime.fromtimestamp(kline[0] / 1000)
+    # Перевірка на помилку в API
+    if "code" in data:
+        return {"error": f"Error from Binance API: {data['msg']}"}
 
-        if await crud.price_exists(db, symbol, ts):
-            continue
-
-        price = PriceCreate(
-            symbol=symbol.upper(),
-            timestamp=ts,
-            open=float(kline[1]),
-            high=float(kline[2]),
-            low=float(kline[3]),
-            close=float(kline[4]),
-            volume=float(kline[5])
+    # Підготовка даних для запису в базу
+    prices_to_insert = []
+    for item in data:
+        price_data = Price(
+            symbol=symbol,
+            timestamp=datetime.utcfromtimestamp(item[0] / 1000),  # Перетворення в datetime
+            open=item[1],
+            high=item[2],
+            low=item[3],
+            close=item[4],
+            volume=item[5],
         )
+        prices_to_insert.append(price_data)
 
-        await crud.add_price(db, price)
-        added += 1
+    # Записуємо дані в базу
+    async with db.begin():
+        db.add_all(prices_to_insert)
 
-    return {"message": f"Imported {added} new entries for {symbol}"}
+    return {"message": f"Data for {symbol} imported successfully!"}
