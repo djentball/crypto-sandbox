@@ -2,8 +2,8 @@ from schemas import TradeCreate
 from db.crud import buy_crypto, sell_crypto, get_binance_price, get_base_price
 from sqlalchemy.ext.asyncio import AsyncSession
 
-PERCENTAGE_THRESHOLD_BUY = -0.1
-PERCENTAGE_THRESHOLD_SELL = 0.31
+PERCENTAGE_THRESHOLD_BUY = -0.7
+PERCENTAGE_THRESHOLD_SELL = 1.0
 TRADE_QUANTITY = 0.003
 
 
@@ -38,7 +38,8 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         "price": current_price,
         "change_percent": round(change, 2),
         "message": f"Price change is {change:.2f}%, not below {PERCENTAGE_THRESHOLD_BUY}% "
-                   f"Target price: {target_price:.2f}"
+                   f"Target price: {target_price:.2f} "
+                   f"Base price: {base_price}"
 
     }
 
@@ -70,5 +71,6 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         "price": current_price,
         "change_percent": round(change, 2),
         "message": f"Price change is {change:.2f}%, not above {PERCENTAGE_THRESHOLD_SELL}% "
-                   f"Target price: {target_price:.2f}"
+                   f"Target price: {target_price:.2f} "
+                   f"Base price: {base_price}"
     }
