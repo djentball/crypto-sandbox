@@ -27,6 +27,7 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         result = await buy_crypto(db, trade_data)
         return {
             "action": "buy",
+            "symbol": symbol,
             "executed": True,
             "price": current_price,
             "change_percent": round(change, 2),
@@ -34,6 +35,7 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         }
     return {
         "action": "buy",
+        "symbol": symbol,
         "executed": False,
         "price": current_price,
         "change_percent": round(change, 2),
@@ -60,6 +62,7 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         result = await sell_crypto(trade_data, db)
         return {
             "action": "sell",
+            "symbol": symbol,
             "executed": True,
             "price": current_price,
             "change_percent": round(change, 2),
@@ -67,6 +70,7 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         }
     return {
         "action": "sell",
+        "symbol": symbol,
         "executed": False,
         "price": current_price,
         "change_percent": round(change, 2),
