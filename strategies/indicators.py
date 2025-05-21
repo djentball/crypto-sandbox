@@ -1,81 +1,87 @@
 import requests
-import numpy as np
+import math
 
-USER_ID = "c6a5c630-2ab6-423b-aa02-4ab69d1da6e3"
-SYMBOL = "BTCUSDT"
-
-
-def fetch_binance_data(symbol="BTCUSDT", interval="1h", limit=300):  # limit зменшено
+# === Функція для завантаження даних ===
+def fetch_binance_data(symbol="BTCUSDT", interval="1h", limit=500):
     url = f"https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": interval, "limit": limit}
     response = requests.get(url, params=params)
     data = response.json()
-
-    closes = np.array([float(item[4]) for item in data], dtype=np.float64)
-    timestamps = [int(item[0]) for item in data]
+    closes = [float(candle[4]) for candle in data]
+    timestamps = [int(candle[0]) for candle in data]
     return timestamps, closes
 
+# === EMA ===
+def calculate_ema(values, window):
+    ema = []
+    k = 2 / (window + 1)
+    sma = sum(values[:window]) / window
+    ema.append(sma)
+    for price in values[window:]:
+        ema.append(price * k + ema[-1] * (1 - k))
+    return [None] * (window - 1) + ema
 
-def calculate_ema(prices, window):
-    ema = np.empty_like(prices)
-    alpha = 2 / (window + 1)
-    ema[window - 1] = np.mean(prices[:window])
-    for i in range(window, len(prices)):
-        ema[i] = prices[i] * alpha + ema[i - 1] * (1 - alpha)
-    ema[:window - 1] = np.nan
-    return ema
+# === RSI ===
+def calculate_rsi(values, window):
+    gains = []
+    losses = []
 
+    for i in range(1, window + 1):
+        change = values[i] - values[i - 1]
+        gains.append(max(0, change))
+        losses.append(max(0, -change))
 
-def calculate_rsi(prices, window=14):
-    deltas = np.diff(prices)
-    gains = np.where(deltas > 0, deltas, 0)
-    losses = np.where(deltas < 0, -deltas, 0)
+    avg_gain = sum(gains) / window
+    avg_loss = sum(losses) / window
 
-    avg_gain = np.full(prices.shape, np.nan, dtype=np.float64)
-    avg_loss = np.full(prices.shape, np.nan, dtype=np.float64)
+    rsi = []
+    if avg_loss == 0:
+        rsi.append(100)
+    else:
+        rs = avg_gain / avg_loss
+        rsi.append(100 - (100 / (1 + rs)))
 
-    avg_gain[window] = np.mean(gains[:window])
-    avg_loss[window] = np.mean(losses[:window])
+    for i in range(window + 1, len(values)):
+        change = values[i] - values[i - 1]
+        gain = max(0, change)
+        loss = max(0, -change)
 
-    for i in range(window + 1, len(prices)):
-        avg_gain[i] = (avg_gain[i - 1] * (window - 1) + gains[i - 1]) / window
-        avg_loss[i] = (avg_loss[i - 1] * (window - 1) + losses[i - 1]) / window
+        avg_gain = (avg_gain * (window - 1) + gain) / window
+        avg_loss = (avg_loss * (window - 1) + loss) / window
 
-    rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
-    rsi = 100 - (100 / (1 + rs))
-    rsi[:window] = np.nan
-    return rsi
+        if avg_loss == 0:
+            rsi.append(100)
+        else:
+            rs = avg_gain / avg_loss
+            rsi.append(100 - (100 / (1 + rs)))
 
+    return [None] * window + rsi
 
-def generate_signal(ema_9, ema_21, rsi, index):
-    if np.isnan(ema_9[index]) or np.isnan(ema_21[index]) or np.isnan(rsi[index]):
-        return "WAIT"
+# === Генерація сигналу ===
+def generate_signal(close, ema_9, ema_21, rsi, user_id="c6a5c630-2ab6-423b-aa02-4ab69d1da6e3"):
+    signal = "WAIT"
+    if ema_9 and ema_21 and rsi:
+        if ema_9 > ema_21 and rsi < 40:
+            requests.post('https://api-aio.alwaysdata.net/crypto/trade/buy', json={
+                "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
+            })
+            signal = "BUY"
+        elif ema_9 < ema_21 and rsi > 60:
+            requests.post('https://api-aio.alwaysdata.net/crypto/trade/sell', json={
+                "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
+            })
+            signal = "SELL"
+    return signal
 
-    if ema_9[index] > ema_21[index] and rsi[index] < 40:
-        requests.post("https://api-aio.alwaysdata.net/crypto/trade/buy", json={
-            "user_id": USER_ID, "symbol": SYMBOL, "quantity": 0.0007
-        })
-        return "BUY"
-
-    if ema_9[index] < ema_21[index] and rsi[index] > 60:
-        requests.post("https://api-aio.alwaysdata.net/crypto/trade/sell", json={
-            "user_id": USER_ID, "symbol": SYMBOL, "quantity": 0.0007
-        })
-        return "SELL"
-
-    return "WAIT"
-
-
-# --- Run ---
-timestamps, closes = fetch_binance_data(SYMBOL)
+# === Основна логіка ===
+timestamps, closes = fetch_binance_data()
 ema_9 = calculate_ema(closes, 9)
 ema_21 = calculate_ema(closes, 21)
 rsi = calculate_rsi(closes, 14)
 
 for i in range(len(closes) - 10, len(closes)):
-    e9 = f"{ema_9[i]:.2f}" if not np.isnan(ema_9[i]) else "nan"
-    e21 = f"{ema_21[i]:.2f}" if not np.isnan(ema_21[i]) else "nan"
-    r = f"{rsi[i]:.2f}" if not np.isnan(rsi[i]) else "nan"
-    print(f"{i}: close={closes[i]:.2f}, EMA_9={e9}, EMA_21={e21}, RSI={r}")
-    signal = generate_signal(ema_9, ema_21, rsi, i)
+    print(
+        f"{i}: close={closes[i]:.2f}, EMA_9={ema_9[i]}, EMA_21={ema_21[i]}, RSI={rsi[i]}"
+    )
+    signal = generate_signal(closes[i], ema_9[i], ema_21[i], rsi[i])
     print("   Signal:", signal)
