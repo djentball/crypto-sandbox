@@ -11,7 +11,8 @@ def price_change_percent(current_price: float, reference_price: float) -> float:
     return ((current_price - reference_price) / reference_price) * 100
 
 
-async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
+async def simple_buy_strategy(db: AsyncSession, user_id: str,
+                              symbol: str, trade_quantity: float = TRADE_QUANTITY):
     current_price = await get_binance_price(symbol)
     base_price = await get_base_price(db, symbol)
     change = price_change_percent(current_price, base_price)
@@ -21,7 +22,7 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
         trade_data = TradeCreate(
             user_id=user_id,
             symbol=symbol,
-            quantity=TRADE_QUANTITY,
+            quantity=trade_quantity,
             price=current_price
         )
         result = await buy_crypto(db, trade_data)
@@ -46,7 +47,8 @@ async def simple_buy_strategy(db: AsyncSession, user_id: str, symbol: str):
     }
 
 
-async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
+async def simple_sell_strategy(db: AsyncSession, user_id: str,
+                               symbol: str, trade_quantity: float = TRADE_QUANTITY):
     current_price = await get_binance_price(symbol)
     base_price = await get_base_price(db, symbol)
     change = price_change_percent(current_price, base_price)
@@ -56,7 +58,7 @@ async def simple_sell_strategy(db: AsyncSession, user_id: str, symbol: str):
         trade_data = TradeCreate(
             user_id=user_id,
             symbol=symbol,
-            quantity=TRADE_QUANTITY,
+            quantity=trade_quantity,
             price=current_price
         )
         result = await sell_crypto(trade_data, db)

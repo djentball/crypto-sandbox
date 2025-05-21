@@ -9,12 +9,17 @@ USER_ID = "dbfb7742-7cc2-4ddf-8dff-fed0e75ad352" #Prod User
 
 async def run():
     async for db in get_session():
-        crypto = ['BTCUSDT', 'XRPUSDT', 'ETHUSDT']
-        for symbol in crypto:
-            buy_result = await simple_buy_strategy(db, USER_ID, symbol)
-            sell_result = await simple_sell_strategy(db, USER_ID, symbol)
+        trade_quantity = {
+            'BTCUSDT': 0.003,
+            'XRPUSDT': 50,
+            'ETHUSDT': 0.005
+        }
+
+        for symbol, quantity in trade_quantity.items():
+            buy_result = await simple_buy_strategy(db, USER_ID, symbol, quantity)
+            sell_result = await simple_sell_strategy(db, USER_ID, symbol, quantity)
             print(f"Buy Result {symbol}:", buy_result)
-            print(f"Sell Result:", sell_result)
+            print(f"Sell Result {symbol}:", sell_result)
 
 if __name__ == "__main__":
     asyncio.run(run())
