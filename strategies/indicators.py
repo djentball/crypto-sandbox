@@ -61,12 +61,12 @@ def calculate_rsi(values, window):
 def generate_signal(close, ema_9, ema_21, rsi, user_id="c6a5c630-2ab6-423b-aa02-4ab69d1da6e3"):
     signal = "WAIT"
     if rsi:
-        if rsi < 40:
+        if rsi < 42:
             requests.post('https://api-aio.alwaysdata.net/crypto/trade/buy', json={
                 "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
             })
             signal = "BUY"
-        elif rsi > 60:
+        elif rsi > 62:
             requests.post('https://api-aio.alwaysdata.net/crypto/trade/sell', json={
                 "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
             })
