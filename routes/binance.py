@@ -25,7 +25,7 @@ def get_klines_binance(symbol: str, interval: str):
 
 @router.post("/get_rsi")
 async def get_rsi(symbol: str, interval: str):
-    timestamps, values = get_klines_binance(symbol, interval).json()
+    timestamps, values = get_klines_binance(symbol, interval)
     window = 14
     gains = []
     losses = []
@@ -63,7 +63,7 @@ async def get_rsi(symbol: str, interval: str):
 
 @router.post("/import")
 async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Depends(get_db)):
-    data = get_klines_binance(symbol, interval).json()
+    data = get_klines_binance(symbol, interval)
 
     prices_to_insert = []
     for item in data:
