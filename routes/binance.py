@@ -25,7 +25,7 @@ def get_klines_binance(symbol: str, interval: str):
 
 @router.post("/get_rsi")
 async def get_rsi(symbol: str, interval: str):
-    timestamps, values = get_klines_binance(symbol, interval)
+    timestamps, values = get_klines_binance(symbol, interval).json()
     window = 14
     gains = []
     losses = []
