@@ -8,6 +8,7 @@ from sqlalchemy import select, exists, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Price, Trade, Wallet, User, TradeType, BasePrice
+from db.normalize_wallet_amount import normalize_wallet_amount
 from schemas import (
     PriceCreate,
     WalletCreate,
@@ -119,7 +120,7 @@ async def buy_crypto(db: AsyncSession, trade: TradeCreate):
 
     wallet = await get_wallet(db, trade.user_id, trade.symbol)
     if wallet:
-        wallet.amount += trade.quantity
+        wallet.amount = round(wallet.amount + trade.quantity, 8)
     else:
         wallet = Wallet(
             id=str(uuid4()),
@@ -165,8 +166,11 @@ async def sell_crypto(trade: TradeCreate, db: AsyncSession):
         raise HTTPException(status_code=400, detail="Insufficient crypto balance")
 
     # Віднімаємо з гаманця
-    wallet.amount -= trade.quantity
-    db.add(wallet)
+    wallet.amount = round(wallet.amount - trade.quantity, 8)
+    if wallet.amount < 1e-8:
+        await db.delete(wallet)
+    else:
+        db.add(wallet)
 
     # Додаємо до балансу користувача
     total_sale_value = trade.quantity * trade_price
@@ -221,10 +225,14 @@ async def get_user_balance(db: AsyncSession, user_id: str) -> UserBalanceOut | N
     crypto_details = {}
 
     for wallet in wallets:
+        # Округлимо й перевіримо, чи залишилась крипта
+        if not normalize_wallet_amount(wallet):
+            await db.delete(wallet)
+            continue  # пропускаємо цей гаманець у відповіді
+
         try:
             price = await get_binance_price(wallet.symbol)
-        except Exception as e:
-
+        except Exception:
             price = 0.0
 
         value = wallet.amount * price
@@ -237,12 +245,14 @@ async def get_user_balance(db: AsyncSession, user_id: str) -> UserBalanceOut | N
         )
 
     total_balance = user.usd_balance + total_crypto_value
+    await db.commit()  # зберегти видалення нульових гаманців
 
     return UserBalanceOut(
         usd_balance=round(user.usd_balance, 2),
         crypto=crypto_details,
         total_balance_usd=round(total_balance, 2)
     )
+
 
 
 async def get_average_buy_price(db: AsyncSession, user_id: str, symbol: str) -> Optional[float]:
