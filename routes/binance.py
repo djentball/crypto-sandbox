@@ -9,6 +9,7 @@ from db.models import Price
 router = APIRouter(prefix="/binance", tags=["Binance"])
 BINANCE_API_URL = "https://api.binance.com/api/v3/klines"
 
+
 def get_klines_binance(symbol: str, interval: str):
     params = {
         "symbol": symbol,
@@ -62,6 +63,7 @@ async def get_rsi(symbol: str, interval: str):
             rsi.append(100 - (100 / (1 + rs)))
 
     return [None] * window + rsi
+
 
 @router.post("/import")
 async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Depends(get_db)):

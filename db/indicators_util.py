@@ -1,8 +1,6 @@
 import requests
-import math
 
 
-# === Функція для завантаження даних ===
 def fetch_binance_data(symbol="BTCUSDT", interval="1h", limit=500):
     url = f"https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": interval, "limit": limit}
@@ -59,34 +57,3 @@ def calculate_rsi(values, window):
             rsi.append(100 - (100 / (1 + rs)))
 
     return [None] * window + rsi
-
-
-# === Генерація сигналу ===
-def generate_signal(rsi, user_id="c6a5c630-2ab6-423b-aa02-4ab69d1da6e3"):
-    signal = "WAIT"
-    if rsi:
-        if rsi < 42:
-            requests.post('https://api-aio.alwaysdata.net/crypto/trade/buy', json={
-                "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
-            })
-            signal = "BUY"
-        elif rsi > 60:
-            requests.post('https://api-aio.alwaysdata.net/crypto/trade/sell', json={
-                "user_id": user_id, "symbol": "BTCUSDT", "quantity": 0.0007
-            })
-            signal = "SELL"
-    return signal
-
-
-# === Основна логіка ===
-timestamps, closes = fetch_binance_data()
-ema_9 = calculate_ema(closes, 9)
-ema_21 = calculate_ema(closes, 21)
-rsi = calculate_rsi(closes, 14)
-
-for i in range(len(closes) - 10, len(closes)):
-    print(
-        f"{i}: close={closes[i]:.2f}, EMA_9={ema_9[i]}, EMA_21={ema_21[i]}, RSI={rsi[i]}"
-    )
-    signal = generate_signal(closes[i], ema_9[i], ema_21[i], rsi[i])
-    print("   Signal:", signal)
