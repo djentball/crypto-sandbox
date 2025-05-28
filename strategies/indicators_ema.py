@@ -1,25 +1,27 @@
 import requests
-
 from db.indicators_util import fetch_binance_data, calculate_ema
 
-
-timestamps, closes = fetch_binance_data()
-ema_9 = calculate_ema(closes, 9)
-ema_21 = calculate_ema(closes, 21)
 user_id = "07e6fb06-2491-4ebd-8435-547f052b0047"
 quantity = 0.0007
+symbol = "BTCUSDT"
+url = "https://api-aio.alwaysdata.net/crypto/trade"
 
-if ema_9 > ema_21:
-    requests.post('https://api-aio.alwaysdata.net/crypto/trade/buy', json={
-        "user_id": user_id, "symbol": "BTCUSDT", "quantity": quantity
-    })
-    signal = "BUY"
-elif ema_9 < ema_21:
-    requests.post('https://api-aio.alwaysdata.net/crypto/trade/sell', json={
-        "user_id": user_id, "symbol": "BTCUSDT", "quantity": quantity
-    })
-    signal = "SELL"
-else:
-    signal = "WAIT"
+closes = fetch_binance_data()[1]
+ema_9, ema_21 = calculate_ema(closes, 9), calculate_ema(closes, 21)
+last_9, last_21 = ema_9[-1], ema_21[-1]
 
-print(signal)
+action = (
+    "buy" if last_9 > last_21 else
+    "sell" if last_9 < last_21 else
+    None
+)
+
+if action:
+    requests.post(f"{url}/{action}", json={
+        "user_id": user_id,
+        "symbol": symbol,
+        "quantity": quantity
+    })
+
+signal = action.upper() if action else "WAIT"
+print(f"EMA_9: {last_9:,.2f} EMA_21: {last_21:,.2f}  {signal=}")
