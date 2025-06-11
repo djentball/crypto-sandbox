@@ -37,10 +37,10 @@ def calculate_rsi(values, window):
 
     rsi = []
     if avg_loss == 0:
-        rsi.append(100)
+        rsi.append({"index": window, "rsi": 100})
     else:
         rs = avg_gain / avg_loss
-        rsi.append(100 - (100 / (1 + rs)))
+        rsi.append({"index": window, "rsi": 100 - (100 / (1 + rs))})
 
     for i in range(window + 1, len(values)):
         change = values[i] - values[i - 1]
@@ -51,9 +51,11 @@ def calculate_rsi(values, window):
         avg_loss = (avg_loss * (window - 1) + loss) / window
 
         if avg_loss == 0:
-            rsi.append(100)
+            rsi_value = 100
         else:
             rs = avg_gain / avg_loss
-            rsi.append(100 - (100 / (1 + rs)))
+            rsi_value = 100 - (100 / (1 + rs))
 
-    return [None] * window + rsi
+        rsi.append({"index": i, "rsi": rsi_value})
+
+    return [{"index": i, "rsi": None} for i in range(window)] + rsi
