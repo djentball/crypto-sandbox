@@ -39,3 +39,11 @@ async def user_balance(user_id: str, db: AsyncSession = Depends(get_db)):
     if balance is None:
         raise HTTPException(status_code=404, detail="User not found")
     return balance
+
+
+@router.get("/", response_model=list[schemas.User])
+async def get_all_users(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    return users
+
