@@ -3,20 +3,20 @@ from datetime import datetime, UTC
 from uuid import uuid4
 from typing import Sequence, Optional
 
-from fastapi import Depends, HTTPException
-from sqlalchemy import select, exists, desc
+from fastapi import HTTPException
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Price, Trade, Wallet, User, TradeType, BasePrice
+from db.models import Price, Trade, Wallet, User, TradeType, BasePrice, FuturesPosition
 from db.normalize_wallet_amount import normalize_wallet_amount
 from schemas import (
     PriceCreate,
     WalletCreate,
     UserCreate,
     TradeCreate,
-    TradeOut,
     UserBalanceOut,
     CryptoBalance,
+    FuturesPositionCreate
 )
 
 
@@ -37,7 +37,6 @@ async def get_prices(session: AsyncSession, symbol: str, limit: int = 100) -> Se
     return result.scalars().all()
 
 
-# Отримати історію угод (опціонально по символу)
 async def get_trades(session: AsyncSession, symbol: str = None, limit: int = 100) -> Sequence[Trade]:
     stmt = select(Trade).order_by(Trade.timestamp.desc()).limit(limit)
     if symbol:
@@ -45,8 +44,6 @@ async def get_trades(session: AsyncSession, symbol: str = None, limit: int = 100
     result = await session.execute(stmt)
     return result.scalars().all()
 
-
-# ===== USERS =====
 
 async def create_user(session: AsyncSession, user: UserCreate) -> User:
     db_user = User(name=user.name)
@@ -65,8 +62,6 @@ async def get_user_by_id(session: AsyncSession, user_id: str) -> Optional[User]:
     result = await session.execute(select(User).where(User.id == user_id))
     return result.scalars().first()
 
-
-# ===== WALLETS =====
 
 async def get_wallet(session: AsyncSession, user_id: str, symbol: str) -> Optional[Wallet]:
     result = await session.execute(
@@ -150,40 +145,33 @@ async def buy_crypto(db: AsyncSession, trade: TradeCreate):
 
 
 async def sell_crypto(trade: TradeCreate, db: AsyncSession):
-    # Отримаємо актуальну ціну з Binance
     symbol = trade.symbol.upper()
     trade_price = await get_binance_price(symbol)
     trade.price = trade_price
 
-    # Отримуємо користувача
     user = await get_user_by_id(db, trade.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Отримуємо гаманець
     wallet = await get_wallet(db, trade.user_id, symbol)
     if not wallet or wallet.amount < trade.quantity:
         raise HTTPException(status_code=400, detail="Insufficient crypto balance")
 
-    # Віднімаємо з гаманця
     wallet.amount = round(wallet.amount - trade.quantity, 8)
     if wallet.amount < 1e-8:
         await db.delete(wallet)
     else:
         db.add(wallet)
 
-    # Додаємо до балансу користувача
     total_sale_value = trade.quantity * trade_price
     user.usd_balance += total_sale_value
     db.add(user)
 
-    # Підрахунок прибутку (опційно)
     avg_buy_price = await get_average_buy_price(db, trade.user_id, symbol)
     profit = None
     if avg_buy_price is not None:
         profit = (trade_price - avg_buy_price) * trade.quantity
 
-    # Створюємо запис про продаж
     new_trade = Trade(
         id=str(uuid4()),
         user_id=trade.user_id,
@@ -198,7 +186,6 @@ async def sell_crypto(trade: TradeCreate, db: AsyncSession):
     await db.commit()
     await db.refresh(new_trade)
 
-    # Додаємо прибуток до об'єкта (але не в БД)
     new_trade.profit = profit
     return new_trade
 
@@ -225,10 +212,9 @@ async def get_user_balance(db: AsyncSession, user_id: str) -> UserBalanceOut | N
     crypto_details = {}
 
     for wallet in wallets:
-        # Округлимо й перевіримо, чи залишилась крипта
         if not normalize_wallet_amount(wallet):
             await db.delete(wallet)
-            continue  # пропускаємо цей гаманець у відповіді
+            continue
 
         try:
             price = await get_binance_price(wallet.symbol)
@@ -293,3 +279,47 @@ async def get_base_price(session: AsyncSession, symbol: str) -> float:
     if db_price:
         return db_price.price
     raise HTTPException(status_code=404, detail=f"Base price for {symbol} not found")
+
+
+async def open_futures_position(
+        db: AsyncSession,
+        position: FuturesPositionCreate,
+        user_id: str
+):
+
+    current_price = await get_binance_price(position.symbol)
+
+    liq_price = calculate_liquidation_price(
+        current_price,
+        position.leverage,
+        position.side
+    )
+
+
+    db_position = FuturesPosition(
+        user_id=user_id,
+        symbol=position.symbol,
+        entry_price=current_price,
+        mark_price=current_price,
+        leverage=position.leverage,
+        side=position.side,
+        quantity=position.quantity,
+        liquidation_price=liq_price,
+        take_profit_price=position.take_profit_price
+    )
+
+    db.add(db_position)
+    await db.commit()
+    return db_position
+
+
+def calculate_liquidation_price(
+        entry_price: float,
+        leverage: int,
+        side: str
+) -> float:
+
+    if side == "LONG":
+        return entry_price * (1 - 0.9 / leverage)
+    else:
+        return entry_price * (1 + 0.9 / leverage)

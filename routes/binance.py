@@ -86,3 +86,42 @@ async def import_binance_data(symbol: str, interval: str, db: AsyncSession = Dep
         db.add_all(prices_to_insert)
 
     return {"message": f"Data for {symbol} imported successfully!"}
+
+
+BINANCE_FUTURES_API = "https://fapi.binance.com"
+
+
+def get_futures_price(symbol: str) -> float:
+    url = f"{BINANCE_FUTURES_API}/fapi/v1/ticker/price?symbol={symbol}"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+
+        data = response.json()
+        price = float(data["price"])
+
+        return price
+
+    except requests.exceptions.HTTPError as http_err:
+        print(f"Помилка HTTP: {http_err}")
+        raise
+    except Exception as err:
+        print(f"Виникла інша помилка: {err}")
+        raise
+
+
+if __name__ == "__main__":
+    try:
+        btc_price = get_futures_price("BTCUSDT")
+        print(f"Поточна ціна ф'ючерсу BTCUSDT: {btc_price}")
+
+        eth_price = get_futures_price("ETHUSDT")
+        print(f"Поточна ціна ф'ючерсу ETHUSDT: {eth_price}")
+
+        get_futures_price("NONEXISTENTCOIN")
+
+    except requests.exceptions.HTTPError as e:
+        print(f"\nНе вдалося отримати ціну: {e.response.status_code} {e.response.reason}")
+    except KeyError:
+        print("\nНе вдалося обробити відповідь від API: не знайдено ключ 'price'.")

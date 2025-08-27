@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Enum, Integer
 from sqlalchemy.orm import relationship
 import datetime
 import uuid
@@ -8,6 +8,7 @@ from db.db import Base
 
 def generate_uuid():
     return str(uuid.uuid4())
+
 
 class Price(Base):
     __tablename__ = "prices"
@@ -21,9 +22,11 @@ class Price(Base):
     close = Column(Float)
     volume = Column(Float)
 
+
 class TradeType(str, enum.Enum):
     buy = "buy"
     sell = "sell"
+
 
 class Trade(Base):
     __tablename__ = "trades"
@@ -36,6 +39,7 @@ class Trade(Base):
     quantity = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     user = relationship("User", back_populates="trades")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -63,3 +67,29 @@ class BasePrice(Base):
 
     symbol = Column(String, primary_key=True)
     price = Column(Float, nullable=False)
+
+
+class FuturesPosition(Base):
+    __tablename__ = 'futures_positions'
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey('users.id'))
+    symbol = Column(String)
+    entry_price = Column(Float)
+    mark_price = Column(Float)
+    leverage = Column(Integer, default=1)
+    side = Column(String)  # 'LONG' or 'SHORT'
+    quantity = Column(Float)
+    liquidation_price = Column(Float)
+    take_profit_price = Column(Float, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String, default="open")
+    exit_price = Column(Float, nullable=True)
+    exit_time = Column(DateTime, nullable=True)
+    realized_pnl = Column(Float, nullable=True)
+
+    user = relationship("User", back_populates="futures_positions")
+
+
+class User(Base):
+    futures_positions = relationship("FuturesPosition", back_populates="user")

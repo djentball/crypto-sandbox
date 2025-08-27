@@ -4,7 +4,7 @@ from sqlalchemy import select
 from db.db import get_db
 import db.crud as crud
 import schemas
-from db.models import User, Wallet, Price
+from db.models import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

@@ -29,7 +29,7 @@ async def buy_currency(trade: TradeCreate, db: AsyncSession = Depends(get_db)):
     trade_out = result["trade"]
     total_cost = result["total_cost"]
 
-    trade_out_schema = TradeOut.from_orm(trade_out)  # Конвертація до Pydantic-схеми
+    trade_out_schema = TradeOut.from_orm(trade_out)
 
     return {**trade_out_schema.dict(), "total_cost": total_cost}
 
